@@ -1,5 +1,9 @@
 module BcdiSimulate
+    using CUDA
+    using LAMMPS
+    using Random
+    using Distributions
+    using BcdiCore
 
-# Write your package code here.
-
+    include("AtomicSimulate.jl")
 end
