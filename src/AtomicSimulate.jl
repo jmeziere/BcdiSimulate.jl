@@ -51,7 +51,7 @@ function atomSimulateElectricField(x, y, z, hRanges, kRanges, lRanges)
 end
 
 """
-    atomSimulateDiffraction(x, y, z, hRanges, kRanges, lRanges)
+    atomSimulateDiffraction(x, y, z, hRanges, kRanges, lRanges, numPhotons; seed=nothing)
 
 Simulate diffraction patterns for a group of atoms (`x`, `y`, and `z`) on
 a sequence of grids in reciprocal space (`hRanges`, `kRanges`, `lRanges`).
@@ -65,9 +65,10 @@ where
 
 `x`, `y`, and `z` do not have to lie on any grid and are assumed to be `Vector{Real}`.
 'hRanges', 'kRanges' and 'lRanges' are not individual points, but are `Vector{StepRangeLen}`,
-that together, define the grid to sample reciprocal space over. In general, this will be 
-faster than a full discrete Fourier transform (with ``O(n^2)`` operations) because it uses
-an NUFFT.
+that together, define the grid to sample reciprocal space over. `numPhotons` defines the
+number of photons that will, on average, be simulated, and `seed` is the rng seed. In general, 
+this will be faster than a full discrete Fourier transform (with ``O(n^2)`` operations) 
+because it uses an NUFFT.
 """
 function atomSimulateDiffraction(x, y, z, hRanges, kRanges, lRanges, numPhotons; seed=nothing)
     elecFields, recSupport, Gs, boxSize = simulateElectricField(x, y, z, hRanges, kRanges, lRanges)
