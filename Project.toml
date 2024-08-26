@@ -12,7 +12,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 julia = "1.10"
-BcdiCore = "0"
+BcdiCore = "0.0.1"
 CUDA = "5.4.3"
 Distributions = "0.25.110"
 LAMMPS = "0.7.0"
