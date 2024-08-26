@@ -5,7 +5,9 @@ Simulate the electric field for a group of atoms (`x`, `y`, and `z`) on
 a sequence of grids in reciprocal space (`hRanges`, `kRanges`, `lRanges`).
 More concretely, calculate
 
-``F_{hkl} = e^{- 2 \\pi i (x h + y k + z l)}}``
+```math
+F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}}
+```
 
 `x`, `y`, and `z` do not have to lie on any grid and are assumed to be `Vector{Real}`.
 'hRanges', 'kRanges' and 'lRanges' are not individual points, but are `Vector{StepRangeLen}`,
@@ -57,11 +59,15 @@ Simulate diffraction patterns for a group of atoms (`x`, `y`, and `z`) on
 a sequence of grids in reciprocal space (`hRanges`, `kRanges`, `lRanges`).
 More concretely, obtain samples from a Poisson distribution that satisfy
 
-``I_hkl} \\overset{ind}{\\sim} Pois(F_{hkl})``
+```math
+I_{hkl} \\overset{ind}{\\sim} Pois(F_{hkl})
+```
 
 where 
 
-``F_{hkl} = e^{- 2 \\pi i (x h + y k + z l)}}``
+```math
+F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}}
+```
 
 `x`, `y`, and `z` do not have to lie on any grid and are assumed to be `Vector{Real}`.
 'hRanges', 'kRanges' and 'lRanges' are not individual points, but are `Vector{StepRangeLen}`,
