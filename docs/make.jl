@@ -1,4 +1,4 @@
-using Documenter, DocumenterCitations
+using Documenter, DocumenterCitations, BcdiSSimulate
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
