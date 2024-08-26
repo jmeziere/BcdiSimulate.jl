@@ -6,7 +6,7 @@ a sequence of grids in reciprocal space (`hRanges`, `kRanges`, `lRanges`).
 More concretely, calculate
 
 ```math
-F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}}
+F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}
 ```
 
 `x`, `y`, and `z` do not have to lie on any grid and are assumed to be `Vector{Real}`.
@@ -66,7 +66,7 @@ I_{hkl} \\overset{ind}{\\sim} Pois(F_{hkl})
 where 
 
 ```math
-F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}}
+F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}
 ```
 
 `x`, `y`, and `z` do not have to lie on any grid and are assumed to be `Vector{Real}`.
