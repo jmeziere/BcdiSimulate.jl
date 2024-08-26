@@ -27,9 +27,9 @@ using Distributions
     c = numPhotons / mapreduce(abs2, +, elecFieldTester)
     intensTester = rand.(Poisson.(c .* abs2.(elecFieldTester)))
 
-    tmp, _, _, _ = BcdiSimulate.simulateElectricField(x, y, z, [hRange], [kRange], [lRange])
+    tmp, _, _, _ = BcdiSimulate.atomSimulateElectricField(x, y, z, [hRange], [kRange], [lRange])
     elecFieldTestee = tmp[1]
-    tmp, _, _, _ = BcdiSimulate.simulateDiffraction(x, y, z, [hRange], [kRange], [lRange], [numPhotons], seed=1)
+    tmp, _, _, _ = BcdiSimulate.atomSimulateDiffraction(x, y, z, [hRange], [kRange], [lRange], [numPhotons], seed=1)
     intensTestee = tmp[1]
 
     @test all(isapprox.(elecFieldTester, elecFieldTestee, rtol=1e-6))

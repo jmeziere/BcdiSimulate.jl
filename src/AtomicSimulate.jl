@@ -77,7 +77,7 @@ this will be faster than a full discrete Fourier transform (with ``O(n^2)`` oper
 because it uses an NUFFT.
 """
 function atomSimulateDiffraction(x, y, z, hRanges, kRanges, lRanges, numPhotons; seed=nothing)
-    elecFields, recSupport, Gs, boxSize = simulateElectricField(x, y, z, hRanges, kRanges, lRanges)
+    elecFields, recSupport, Gs, boxSize = atomSimulateElectricField(x, y, z, hRanges, kRanges, lRanges)
     intens = Array{Int64, 3}[]
     if seed != nothing
         Random.seed!(seed)
