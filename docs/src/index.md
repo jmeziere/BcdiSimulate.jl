@@ -1,4 +1,4 @@
-# BcdiStrain.jl Documentation
+# BcdiSimulate.jl Documentation
 
 ## About
 

@@ -3,7 +3,7 @@ using Documenter, DocumenterCitations, BcdiSimulate
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
 makedocs(
-    sitename="BcdiStrain.jl",
+    sitename="BcdiSimulate.jl",
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true"
     ),
