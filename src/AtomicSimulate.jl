@@ -10,46 +10,57 @@ F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}
 ```
 
 `x`, `y`, and `z` do not have to lie on any grid and are assumed to be `Vector{Real}`.
-'hRanges', 'kRanges' and 'lRanges' are not individual points, but are `Vector{StepRangeLen}`,
+`hRanges`, `kRanges` and `lRanges` are not individual points, but are `Vector{StepRangeLen}`,
 that together, define the grid to sample reciprocal space over. In general, this will be
 faster than a full discrete Fourier transform (with ``O(n^2)`` operations) because it uses
 an NUFFT.
 """
-function atomSimulateElectricField(x, y, z, hRanges, kRanges, lRanges)
+function atomSimulateElectricField(x, y, z, hRanges, kRanges, lRanges, rotations)
     x = CuArray{Float64}(x)
     y = CuArray{Float64}(y)
     z = CuArray{Float64}(z)
 
-    elecFields = Array{ComplexF64, 3}[]
-    recSupport = Array{Float64, 3}[]
-    Gs = Vector{Float64}[]
+    elecFields = Array{ComplexF64, 3}[zeros(ComplexF64,hRanges[i].len,kRanges[i].len,lRanges[i].len) for i in 1:length(hRanges)]
+    recSupport = Array{Float64, 3}[ones(Bool, size(elecFields[i])) for i in 1:length(hRanges)]
+    GCens = Vector{Float64}[zeros(3) for i in 1:length(hRanges)]
+    GMaxs = Vector{Float64}[zeros(3) for i in 1:length(hRanges)]
     boxSize = 1.0/Float64(hRanges[1].step)
-    for i in 1:length(hRanges)
-        Gh = Float64((hRanges[i].ref + hRanges[i].step * div(hRanges[i].len, 2)) / hRanges[i].step)
-        Gk = Float64((kRanges[i].ref + kRanges[i].step * div(kRanges[i].len, 2)) / kRanges[i].step)
-        Gl = Float64((lRanges[i].ref + lRanges[i].step * div(lRanges[i].len, 2)) / lRanges[i].step)
-        h = zeros(0,0,0)
-        k = zeros(0,0,0)
-        l = zeros(0,0,0)
-        G = [Gh, Gk, Gl]
-        state = BcdiCore.AtomicState(
-            "L2", false, 
-            zeros(hRanges[i].len,kRanges[i].len,lRanges[i].len), 
-            G, h, k, l, trues(0,0,0)
-        )
-        BcdiCore.setpts!(
-            state,
-            x .* Float64(hRanges[i].step) .* 2 .* pi, 
-            y .* Float64(kRanges[i].step) .* 2 .* pi, 
-            z .* Float64(lRanges[i].step) .* 2 .* pi,
-            false
-        )
-        BcdiCore.forwardProp(state, true)
-        push!(elecFields, Array(state.recipSpace))
-        push!(recSupport, ones(Bool, size(elecFields[end])))
-        push!(Gs, G)
+    @sync for i in 1:length(hRanges)
+        @async begin
+            Gh = hRanges[i][div(hRanges[i].len, 2)+1] / Float64(hRanges[i].step)
+            Gk = kRanges[i][div(kRanges[i].len, 2)+1] / Float64(kRanges[i].step)
+            Gl = lRanges[i][div(lRanges[i].len, 2)+1] / Float64(lRanges[i].step)
+            h = zeros(0,0,0)
+            k = zeros(0,0,0)
+            l = zeros(0,0,0)
+            G = [Gh, Gk, Gl]
+            state = BcdiCore.AtomicState(
+                "L2", false, 
+                zeros(hRanges[i].len,kRanges[i].len,lRanges[i].len), 
+                G, h, k, l, trues(0,0,0)
+            )
+            rot = transpose(rotations[i])
+            xp = rot[1,1] .* x .+ rot[1,2] .* y .+ rot[1,3] .* z
+            yp = rot[2,1] .* x .+ rot[2,2] .* y .+ rot[2,3] .* z
+            zp = rot[3,1] .* x .+ rot[3,2] .* y .+ rot[3,3] .* z
+            BcdiCore.setpts!(
+                state,
+                xp .* Float64(hRanges[i].step) .* 2 .* pi, 
+                yp .* Float64(kRanges[i].step) .* 2 .* pi, 
+                zp .* Float64(lRanges[i].step) .* 2 .* pi,
+                false
+            )
+            BcdiCore.forwardProp(state, true)
+            copyto!(elecFields[i], state.recipSpace)
+            GCens[i] .= rotations[i] * G
+            GCens[i] .*= [hRanges[i].step,kRanges[i].step,lRanges[i].step]
+            maxarg = argmax(abs2.(elecFields[i]))
+            GMaxs[i] .= [hRanges[i][maxarg[1]], kRanges[i][maxarg[2]], lRanges[i][maxarg[3]]]
+            GMaxs[i] .= rotations[i] * GMaxs[i]
+            nothing  # JuliaLang/julia#40626
+        end
     end
-    return elecFields, recSupport, Gs, boxSize
+    return elecFields, recSupport, GCens, GMaxs, boxSize
 end
 
 """
@@ -70,14 +81,14 @@ F_{hkl} = \\sum_j e^{- 2 \\pi i (x_j h + y_j k + z_j l)}
 ```
 
 `x`, `y`, and `z` do not have to lie on any grid and are assumed to be `Vector{Real}`.
-'hRanges', 'kRanges' and 'lRanges' are not individual points, but are `Vector{StepRangeLen}`,
+`hRanges`, `kRanges` and `lRanges` are not individual points, but are `Vector{StepRangeLen}`,
 that together, define the grid to sample reciprocal space over. `numPhotons` defines the
 number of photons that will, on average, be simulated, and `seed` is the rng seed. In general, 
 this will be faster than a full discrete Fourier transform (with ``O(n^2)`` operations) 
 because it uses an NUFFT.
 """
-function atomSimulateDiffraction(x, y, z, hRanges, kRanges, lRanges, numPhotons; seed=nothing)
-    elecFields, recSupport, Gs, boxSize = atomSimulateElectricField(x, y, z, hRanges, kRanges, lRanges)
+function atomSimulateDiffraction(x, y, z, hRanges, kRanges, lRanges, rotations, numPhotons; seed=nothing)
+    elecFields, recSupport, GCens, GMaxs, boxSize = atomSimulateElectricField(x, y, z, hRanges, kRanges, lRanges, rotations)
     intens = Array{Int64, 3}[]
     if seed != nothing
         Random.seed!(seed)
@@ -85,8 +96,11 @@ function atomSimulateDiffraction(x, y, z, hRanges, kRanges, lRanges, numPhotons;
     for i in 1:length(elecFields)
         c = numPhotons[i] / mapreduce(abs2, +, elecFields[i])
         push!(intens, rand.(Poisson.(Array(c .* abs2.(elecFields[i])))))
+        maxarg = argmax(intens[i])
+        GMaxs[i] .= [hRanges[i][maxarg[1]], kRanges[i][maxarg[2]], lRanges[i][maxarg[3]]]
+        GMaxs[i] .= rotations[i] * GMaxs[i]
     end
-    return intens, recSupport, Gs, boxSize
+    return intens, recSupport, GCens, GMaxs, boxSize
 end
 
 """
@@ -147,3 +161,91 @@ function relaxCrystal(x, y, z, lmpOptions, potentialName)
     @views y .= newPos[2, indsPerm]
     @views z .= newPos[3, indsPerm]
 end
+
+function generateDisplacement(x, y, z, recipLatt, xRange, yRange, zRange)
+    imDisp = CUDA.zeros(Float64, 3, xRange.len * yRange.len * zRange.len)
+
+    x = CuArray{Float64}(x)
+    y = CuArray{Float64}(y)
+    z = CuArray{Float64}(z)
+    recipLatt = CuArray{Float64}(recipLatt)
+
+    atDisp = CUDA.zeros(Float64, 3, length(x))
+    atDisp[1,:] .= x
+    atDisp[2,:] .= y
+    atDisp[3,:] .= z
+
+    function getInd(x, y, z)
+        return (
+            floor(Int64, (x-Float64(xRange.ref)) / Float64(xRange.step)+1/2) + 1,
+            floor(Int64, (y-Float64(yRange.ref)) / Float64(yRange.step)+1/2) + 1,
+            floor(Int64, (z-Float64(zRange.ref)) / Float64(zRange.step)+1/2) + 1
+        )
+    end
+    atInds = getInd.(x, y, z)
+    imInds = cu(vec(CartesianIndex.(Iterators.product(1:xRange.len,1:yRange.len,1:zRange.len))))
+
+    atDisp = recipLatt * atDisp
+    atDisp .-= floor.(Int64, atDisp .- 0.5)
+    atDisp = exp.(1im .* 2 .* pi .* atDisp)
+        
+    function aveDisp(imInd, atInds, atDisp)
+        tmp = 0.0 + 0.0 * 1im
+        count = 0
+        for i in 1:length(atInds)
+            if atInds[i] == imInd
+                tmp += atDisp[i]
+                count += 1
+            end
+        end
+        if count != 0
+            return angle(tmp)
+        else
+            return 0.0
+        end
+    end
+
+    @views imDisp[1,:] .= aveDisp.(imInds, Ref(atInds), Ref(atDisp[1,:]))
+    @views imDisp[2,:] .= aveDisp.(imInds, Ref(atInds), Ref(atDisp[2,:]))
+    @views imDisp[3,:] .= aveDisp.(imInds, Ref(atInds), Ref(atDisp[3,:]))
+    imDisp = recipLatt \ imDisp
+
+    return 
+        reshape(Array(imDisp[1,:]), xRange.len, yRange.len, zRange.len), 
+        reshape(Array(imDisp[2,:]), xRange.len, yRange.len, zRange.len),
+        reshape(Array(imDisp[3,:]), xRange.len, yRange.len, zRange.len)
+end
+
+function getRotations(from, to)
+    rotations = []
+    for i in 1:length(from)
+        kp = cross(from[i],to[i])
+        theta = acos(dot(from[i],to[i])/(norm(from[i])*norm(to[i])))
+        k = kp/norm(kp)
+        K = [
+            0 -k[3] k[2];
+            k[3] 0 -k[1];
+            -k[2] k[1] 0;
+        ]
+        push!(rotations, I + sin(theta) * K + (1 - cos(theta)) * (K*K))
+    end
+    return rotations
+end
+
+function createGoldSample(box, numVoronoi)
+    seed = create([4.078,4.078,4.078],"fcc","Au",[0,0],[[1,0,0],[0,1,0],[0,0,1]])
+    nodes = [[box[1]/2,box[2]/2,box[3]/2,0,0,0]]
+    for i in 1:numVoronoi-1
+        push!(nodes, [
+            rand() * box[1], rand() * box[2], rand() * box[3],
+            rand() * 180 - 90, rand() * 180 - 90, rand() * 180 - 90
+        ])
+    end
+    config = polycrystal(seed, box, nodes)
+    select(config, "prop","grainID",1)
+    select(config, "invert")
+    removeatom(config, "select")
+    center(config, "com")
+    return config.P[1,:], config.P[2,:], config.P[3,:]
+end
+
